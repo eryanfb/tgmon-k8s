@@ -1,0 +1,400 @@
+version: '3.6'
+
+services:
+  ipv6:
+    image: secure.cxl-terragraph.com:443/migo:latest
+    restart: unless-stopped
+    network_mode: "host"
+    privileged: true
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /lib/modules:/lib/modules:ro
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "10"
+
+  db:
+    image: mysql:5
+    env_file:
+      - ./env/mysql.env
+    environment:
+      - MYSQL_ROOT_PASSWORD=12345
+    restart: unless-stopped
+    volumes:
+      - ./mysql_init_scripts:/docker-entrypoint-initdb.d:ro
+      - ./docker_volumes/mysql_db:/var/lib/mysql
+    networks:
+      - terragraph_net
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "10"
+    depends_on:
+      - ipv6
+
+  db_log_cleanup:
+    image: secure.cxl-terragraph.com:443/nms:latest
+    env_file:
+      - ./env/cleaner.env
+      - ./env/mysql.env
+      - ./env/time.env
+    restart: unless-stopped
+    volumes:
+      - ./docker_volumes/logs:/logs
+    networks:
+      - terragraph_net
+    command: ["/bin/sh", "-c", "ln -sf $${TZ_FILE} /etc/localtime && until nc -z $${MYSQL_HOST} 3306; do sleep 1; done && /usr/src/service/mysql_partitioner/run"]
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "10"
+    depends_on:
+      - ipv6
+      - db
+
+  nms:
+    image: facebookconnectivity-tg-docker.jfrog.io/tgnms:latest
+    env_file:
+      - ./env/mysql.env
+      - ./env/nms.env
+      - ./env/time.env
+    restart: unless-stopped
+    volumes:
+      - ./docker_volumes/logs:/nodelogs
+    ports:
+      - "80"
+    networks:
+      - terragraph_net
+    command: ["/bin/sh", "-c", "ln -sf $${TZ_FILE} /etc/localtime && until nc -z bqs 8086; do sleep 1; done && cd /app/fbcnms-projects/tgnms && yarn run start"]
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "10"
+    depends_on:
+      - ipv6
+      - db
+      - bqs
+
+  beringei_1s:
+    image: secure.cxl-terragraph.com:443/beringei:latest
+    env_file:
+      - ./env/time.env
+    environment:
+      - BERINGEI_HOST=beringei
+      - PORT=9991
+      - NAME=beringei_1s
+      - INTERVAL=1
+      # -buckets (Number of historical buckets to use)
+      - BUCKETS=12
+      # -bucket_size (Size of each bucket in seconds)
+      - BUCKET_SIZE=300 # 5 minutes
+      - BUCKET_FINALIZE_SEC=10
+      - ALLOWED_TIMESTAMP_BEHIND=30
+    cap_add:
+      - SYS_NICE
+    restart: unless-stopped
+    volumes:
+      - ./docker_volumes/beringei:/data
+    networks:
+      - terragraph_net
+    command: ["/bin/sh", "-c", "ln -sf $${TZ_FILE} /etc/localtime && beringei/tools/beringei_configuration_generator --file_path $${NAME}.json --host_names $${HOSTNAME} --port $${PORT} && beringei/service/beringei_main -beringei_configuration_path $${NAME}.json -create_directories -sleep_between_bucket_finalization_secs $${BUCKET_FINALIZE_SEC} -allowed_timestamp_behind $${ALLOWED_TIMESTAMP_BEHIND} -bucket_size $${BUCKET_SIZE} -buckets $${BUCKETS} -data_directory=/data/$${NAME} --port $${PORT} -mintimestampdelta=$${INTERVAL} -logtostderr -v=2"]
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "10"
+    depends_on:
+      - ipv6
+
+  beringei_30s:
+    image: secure.cxl-terragraph.com:443/beringei:latest
+    env_file:
+      - ./env/time.env
+    environment:
+      - BERINGEI_HOST=beringei
+      - PORT=9992
+      - NAME=beringei_30s
+      - INTERVAL=30
+      - BUCKETS=48
+      - BUCKET_SIZE=3600 # one hour
+      - BUCKET_FINALIZE_SEC=120
+      - ALLOWED_TIMESTAMP_BEHIND=120
+    cap_add:
+      - SYS_NICE
+    restart: unless-stopped
+    volumes:
+      - ./docker_volumes/beringei:/data
+    networks:
+      - terragraph_net
+    command: ["/bin/sh", "-c", "ln -sf $${TZ_FILE} /etc/localtime && beringei/tools/beringei_configuration_generator --file_path $${NAME}.json --host_names $${HOSTNAME} --port $${PORT} && beringei/service/beringei_main -beringei_configuration_path $${NAME}.json -create_directories -sleep_between_bucket_finalization_secs $${BUCKET_FINALIZE_SEC} -allowed_timestamp_behind $${ALLOWED_TIMESTAMP_BEHIND} -bucket_size $${BUCKET_SIZE} -buckets $${BUCKETS} -data_directory=/data/$${NAME} --port $${PORT} -mintimestampdelta=$${INTERVAL} -logtostderr -v=2"]
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "10"
+    depends_on:
+      - ipv6
+
+  beringei_900s:
+    image: secure.cxl-terragraph.com:443/beringei:latest
+    env_file:
+      - ./env/time.env
+    environment:
+      - BERINGEI_HOST=beringei
+      - PORT=9993
+      - NAME=beringei_900s
+      - INTERVAL=900 # 15 mins
+      - BUCKETS=90 # 90 days
+      - BUCKET_SIZE=86400 # one day
+      - BUCKET_FINALIZE_SEC=1200
+      - ALLOWED_TIMESTAMP_BEHIND=1200
+    cap_add:
+      - SYS_NICE
+    restart: unless-stopped
+    volumes:
+      - ./docker_volumes/beringei:/data
+    networks:
+      - terragraph_net
+    command: ["/bin/sh", "-c", "ln -sf $${TZ_FILE} /etc/localtime && beringei/tools/beringei_configuration_generator --file_path $${NAME}.json --host_names $${HOSTNAME} --port $${PORT} && beringei/service/beringei_main -beringei_configuration_path $${NAME}.json -create_directories -sleep_between_bucket_finalization_secs $${BUCKET_FINALIZE_SEC} -allowed_timestamp_behind $${ALLOWED_TIMESTAMP_BEHIND} -bucket_size $${BUCKET_SIZE} -buckets $${BUCKETS} -data_directory=/data/$${NAME} --port $${PORT} -mintimestampdelta=$${INTERVAL} -logtostderr -v=2"]
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "10"
+    depends_on:
+      - ipv6
+
+  bqs:
+    image: secure.cxl-terragraph.com:443/beringei:latest
+    env_file:
+      - ./env/bqs.env
+      - ./env/mysql.env
+      - ./env/time.env
+    cap_add:
+      - SYS_NICE
+    restart: unless-stopped
+    ports:
+      - "8086:8086"
+    volumes:
+      - ./docker_volumes/logs:/home/nms/data
+      - ./mysql_init_scripts:/mysql-scripts
+    networks:
+      - terragraph_net
+    command: ["/bin/sh", "-c", "ln -sf $${TZ_FILE} /etc/localtime && until nc -z db 3306; do sleep 1; done && mysql -u$${MYSQL_USER} -p$${MYSQL_PASS} < /mysql-scripts/cxl.sql; until nc -z beringei_30s 9992; do sleep 1; done && beringei/tools/beringei_configuration_generator --file_path beringei_1s.json --host_names beringei_1s --port 9991 && beringei/tools/beringei_configuration_generator --file_path beringei_30s.json --host_names beringei_30s --port 9992 && beringei/tools/beringei_configuration_generator --file_path beringei_900s.json --host_names beringei_900s --port 9993 && beringei/tools/query_service/beringei_query_service -beringei_configuration_path beringei.json -http_port 8086 -threads $${BQS_THREADS} -writer_queue_size $${QUEUE_CAPACITY} -gorilla_queue_capacity $${QUEUE_CAPACITY} -gorilla_queue_capacity_size_ratio $${QUEUE_CAPACITY_SIZE_RATIO} -gorilla_retry_queue_capacity $${RETRY_QUEUE_CAPACITY} -mysql_url tcp://$${MYSQL_HOST}:3306 -mysql_user $${MYSQL_USER} -mysql_pass $${MYSQL_PASS} -logtostderr"]
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "10"
+    depends_on:
+      - ipv6
+      - db
+      - beringei_1s
+      - beringei_30s
+      - beringei_900s
+
+  analytics:
+    image: secure.cxl-terragraph.com:443/analytics:latest
+    env_file:
+      - ./env/mysql.env
+    restart: unless-stopped
+    volumes:
+      - ./docker_volumes/logs:/analytics/logs
+      - ./docker_volumes/analytics/config:/analytics/config
+    networks:
+      - terragraph_net
+    command: ["/bin/sh", "-c", "cd /usr/local/analytics/module; python run_pipeline.py"]
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "10"
+    depends_on:
+      - ipv6
+      - db
+      - bqs
+
+  jupyter:
+    image: secure.cxl-terragraph.com:443/analytics:latest
+    env_file:
+      - ./env/mysql.env
+    restart: unless-stopped
+    volumes:
+      - ./docker_volumes/logs:/analytics/logs
+    networks:
+      - terragraph_net
+    command: ["/bin/sh", "-c", "jupyter notebook --no-browser --ip '0.0.0.0' --allow-root --port 8888 --notebook-dir /usr/local/analytics --NotebookApp.token='' --NotebookApp.base_url=jupyter"]
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "10"
+    depends_on:
+      - ipv6
+      - db
+      - bqs
+
+  network_test:
+    image: secure.cxl-terragraph.com:443/analytics:latest
+    env_file:
+      - ./env/mysql.env
+      - ./env/django.env
+    restart: always
+    volumes:
+      - ./docker_volumes/logs:/analytics/logs
+    ports:
+      - "8000:8000"
+    networks:
+      - terragraph_net
+    command: ["/bin/sh", "-c", "cd /usr/local/analytics/network_test_api; until nc -z db 3306; do sleep 1; done && python manage.py migrate && python clean_up_db.py && python manage.py runserver 0.0.0.0:8000"]
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "10"
+    depends_on:
+      - ipv6
+      - db
+      - bqs
+
+  udp_ping_client:
+    image: secure.cxl-terragraph.com:443/beringei:latest
+    env_file:
+      - ./env/mysql.env
+    restart: unless-stopped
+    ports:
+      - "31338:31338/udp"
+    networks:
+      - terragraph_net
+    command: ["/bin/sh", "-c", "until nc -z bqs 8086; do sleep 1; done && beringei/tools/ping_service/udp_ping_client -logtostderr -mysql_url tcp://$${MYSQL_HOST}:3306 -mysql_user $${MYSQL_USER} -mysql_pass $${MYSQL_PASS} -bqs_ip bqs -bqs_port 8086"]
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "10"
+    depends_on:
+      - ipv6
+      - bqs
+      - db
+
+  prometheus:
+    image: prom/prometheus
+    env_file:
+     - ./env/prometheus.env
+    restart: unless-stopped
+    ports:
+     - "9090"
+    networks:
+     - terragraph_net
+    volumes:
+     - ./docker_volumes/prometheus/config:/etc/prometheus
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "10"
+    command: ["--config.file=/etc/prometheus/prometheus.yml",
+              "--storage.tsdb.path=/prometheus",
+              "--web.console.libraries=/usr/share/prometheus/console_libraries",
+              "--web.console.templates=/usr/share/prometheus/consoles",
+              "--web.external-url=https://prometheus/prometheus/",
+              "--web.route-prefix=/"]
+    depends_on:
+      - ipv6
+      - cadvisor
+
+  grafana:
+    image: secure.cxl-terragraph.com:443/tgnms-grafana:latest
+    env_file:
+      - ./env/mysql.env
+      - ./env/grafana.env
+    environment:
+      - GF_DATABASE_TYPE=mysql
+      - GF_DATABASE_HOST=db:3306
+      - GF_DATABASE_NAME=$${GRAFANA_DB}
+      - GF_USERS_DEFAULT_THEME=light
+      - GF_SECURITY_ADMIN_PASSWORD=$${GRAFANA_ADMIN_PASS}
+      - GF_DATABASE_USER=$${GRAFANA_MYSQL_WRITER}
+      - GF_DATABASE_PASSWORD=$${GRAFANA_MYSQL_WRITER_PASS}
+      - GF_USERS_AUTO_ASSIGN_ORG_ROLE=Editor
+    restart: unless-stopped
+    ports:
+      - "3000"
+    networks:
+      - terragraph_net
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "10"
+    depends_on:
+      - ipv6
+      - db
+      - bqs
+
+  grafana_util:
+    image: secure.cxl-terragraph.com:443/tgnms-grafana:latest
+    env_file:
+      - ./env/mysql.env
+      - ./env/grafana.env
+    restart: "no"
+    networks:
+      - terragraph_net
+    entrypoint: ["/bin/sh", "-c", "until nc -z grafana 3000; do sleep 1; done && until nc -z bqs 8086; do sleep 1; done && cd /var/lib/grafana && grafana_cli -d -c grafana -w $${GRAFANA_ADMIN_PASS} import-data-sources --ds_ip bqs --ds_port 8086 --ds_file beringei_data_source.json; grafana_cli -d -c grafana -w $${GRAFANA_ADMIN_PASS} import-data-sources --ds_ip db --ds_port 3306 --ds_file mysql_data_source.json --ds_user $${GRAFANA_MYSQL_READER} --ds_passwd $${GRAFANA_MYSQL_READER_PASS}; grafana_cli -d -c grafana -w $${GRAFANA_ADMIN_PASS} import-data-sources --ds_ip prometheus --ds_port 9090 --ds_file prometheus_data_source.json; grafana_cli -d -c grafana -w $${GRAFANA_ADMIN_PASS} add-users; grafana_cli -d -c grafana -w $${GRAFANA_ADMIN_PASS} import-dashboards"]
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "10"
+    depends_on:
+      - ipv6
+      - db
+      - bqs
+      - grafana
+
+  cadvisor:
+    image: google/cadvisor:latest
+    container_name: cadvisor
+    ports:
+     - 8080
+    volumes:
+     - /:/rootfs:ro
+     - /var/run:/var/run:rw
+     - /sys:/sys:ro
+     - /var/lib/docker/:/var/lib/docker:ro
+    networks:
+     - terragraph_net
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "10"
+    depends_on:
+     - ipv6
+
+  nginx:
+    image: nginx:latest
+    restart: always
+    ports:
+      - "80:80"
+    networks:
+      - terragraph_net
+    volumes:
+      - ./docker_volumes/nginx/certs:/etc/nginx/certs
+      - ./docker_volumes/nginx/conf.d:/etc/nginx/conf.d
+      - ./docker_volumes/nginx/services.d:/etc/nginx/services.d
+      - ./docker_volumes/nginx/html:/usr/share/nginx/html
+      - ./docker_volumes/nginx/htpasswd:/etc/nginx/htpasswd
+    depends_on:
+      - nms
+      - grafana
+      - prometheus
+
+networks:
+  terragraph_net:
+    external: true
