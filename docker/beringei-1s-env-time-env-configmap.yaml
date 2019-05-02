@@ -1,0 +1,9 @@
+apiVersion: v1
+data:
+  TZ_FILE: /usr/share/zoneinfo/America/Los_Angeles
+kind: ConfigMap
+metadata:
+  creationTimestamp: null
+  labels:
+    io.kompose.service: beringei-1s-env-time-env
+  name: beringei-1s-env-time-env

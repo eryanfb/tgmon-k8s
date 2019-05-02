@@ -1,0 +1,58 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  annotations:
+    kompose.cmd: kompose convert
+    kompose.version: 1.16.0 (0c01309)
+  creationTimestamp: null
+  labels:
+    io.kompose.service: analytics
+  name: analytics
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        io.kompose.service: analytics
+    spec:
+      containers:
+      - args:
+        - /bin/sh
+        - -c
+        - cd /usr/local/analytics/module; python run_pipeline.py
+        env:
+        - name: MYSQL_HOST
+          valueFrom:
+            configMapKeyRef:
+              key: MYSQL_HOST
+              name: analytics-env-mysql-env
+        - name: MYSQL_PASS
+          valueFrom:
+            configMapKeyRef:
+              key: MYSQL_PASS
+              name: analytics-env-mysql-env
+        - name: MYSQL_USER
+          valueFrom:
+            configMapKeyRef:
+              key: MYSQL_USER
+              name: analytics-env-mysql-env
+        image: secure.cxl-terragraph.com:443/analytics:latest
+        name: analytics
+        resources: {}
+        volumeMounts:
+        - mountPath: /analytics/logs
+          name: analytics-claim0
+        - mountPath: /analytics/config
+          name: analytics-claim1
+      restartPolicy: Always
+      volumes:
+      - name: analytics-claim0
+        persistentVolumeClaim:
+          claimName: analytics-claim0
+      - name: analytics-claim1
+        persistentVolumeClaim:
+          claimName: analytics-claim1
+status: {}

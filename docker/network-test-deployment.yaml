@@ -1,0 +1,62 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  annotations:
+    kompose.cmd: kompose convert
+    kompose.version: 1.16.0 (0c01309)
+  creationTimestamp: null
+  labels:
+    io.kompose.service: network-test
+  name: network-test
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        io.kompose.service: network-test
+    spec:
+      containers:
+      - args:
+        - /bin/sh
+        - -c
+        - cd /usr/local/analytics/network_test_api; until nc -z db 3306; do sleep
+          1; done && python manage.py migrate && python clean_up_db.py && python manage.py
+          runserver 0.0.0.0:8000
+        env:
+        - name: MYSQL_HOST
+          valueFrom:
+            configMapKeyRef:
+              key: MYSQL_HOST
+              name: network-test-env-mysql-env
+        - name: MYSQL_PASS
+          valueFrom:
+            configMapKeyRef:
+              key: MYSQL_PASS
+              name: network-test-env-mysql-env
+        - name: MYSQL_USER
+          valueFrom:
+            configMapKeyRef:
+              key: MYSQL_USER
+              name: network-test-env-mysql-env
+        - name: SECRET_KEY
+          valueFrom:
+            configMapKeyRef:
+              key: SECRET_KEY
+              name: network-test-env-django-env
+        image: secure.cxl-terragraph.com:443/analytics:latest
+        name: network-test
+        ports:
+        - containerPort: 8000
+        resources: {}
+        volumeMounts:
+        - mountPath: /analytics/logs
+          name: network-test-claim0
+      restartPolicy: Always
+      volumes:
+      - name: network-test-claim0
+        persistentVolumeClaim:
+          claimName: network-test-claim0
+status: {}

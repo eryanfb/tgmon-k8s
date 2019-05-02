@@ -1,0 +1,41 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  annotations:
+    kompose.cmd: kompose convert
+    kompose.version: 1.16.0 (0c01309)
+  creationTimestamp: null
+  labels:
+    io.kompose.service: bqs
+  name: bqs
+spec:
+  replicas: 1
+  strategy: {}
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        io.kompose.service: bqs
+    spec:
+      containers:
+      - args:
+        - /bin/sh
+        - -c
+        - beringei/tools/beringei_configuration_generator --file_path beringei.json
+          --host_names beringei && sleep 30 && beringei/tools/query_service/beringei_query_service
+          -beringei_configuration_path beringei.json -http_port 8086 -threads 4 -writer_queue_size
+          500000 -logtostderr -v=2 -mysql_url tcp://db:3306 --mysql_pass 12345
+        env:
+        - name: BERINGEI_HOST
+          value: beringei_query_service
+        image: terragraph/beringei:latest
+        name: bqs
+        ports:
+        - containerPort: 8086
+        resources: {}
+        securityContext:
+          capabilities:
+            add:
+            - SYS_NICE
+      restartPolicy: Always
+status: {}

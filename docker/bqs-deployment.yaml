@@ -1,0 +1,100 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  annotations:
+    kompose.cmd: kompose convert
+    kompose.version: 1.16.0 (0c01309)
+  creationTimestamp: null
+  labels:
+    io.kompose.service: bqs
+  name: bqs
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        io.kompose.service: bqs
+    spec:
+      containers:
+      - args:
+        - /bin/sh
+        - -c
+        - ln -sf ${TZ_FILE} /etc/localtime && until nc -z db 3306; do sleep 1; done
+          && mysql -u${MYSQL_USER} -p${MYSQL_PASS} < /mysql-scripts/cxl.sql; until
+          nc -z beringei_30s 9992; do sleep 1; done && beringei/tools/beringei_configuration_generator
+          --file_path beringei_1s.json --host_names beringei_1s --port 9991 && beringei/tools/beringei_configuration_generator
+          --file_path beringei_30s.json --host_names beringei_30s --port 9992 && beringei/tools/beringei_configuration_generator
+          --file_path beringei_900s.json --host_names beringei_900s --port 9993 &&
+          beringei/tools/query_service/beringei_query_service -beringei_configuration_path
+          beringei.json -http_port 8086 -threads ${BQS_THREADS} -writer_queue_size
+          ${QUEUE_CAPACITY} -gorilla_queue_capacity ${QUEUE_CAPACITY} -gorilla_queue_capacity_size_ratio
+          ${QUEUE_CAPACITY_SIZE_RATIO} -gorilla_retry_queue_capacity ${RETRY_QUEUE_CAPACITY}
+          -mysql_url tcp://${MYSQL_HOST}:3306 -mysql_user ${MYSQL_USER} -mysql_pass
+          ${MYSQL_PASS} -logtostderr
+        env:
+        - name: BQS_THREADS
+          valueFrom:
+            configMapKeyRef:
+              key: BQS_THREADS
+              name: bqs-env-bqs-env
+        - name: MYSQL_HOST
+          valueFrom:
+            configMapKeyRef:
+              key: MYSQL_HOST
+              name: bqs-env-mysql-env
+        - name: MYSQL_PASS
+          valueFrom:
+            configMapKeyRef:
+              key: MYSQL_PASS
+              name: bqs-env-mysql-env
+        - name: MYSQL_USER
+          valueFrom:
+            configMapKeyRef:
+              key: MYSQL_USER
+              name: bqs-env-mysql-env
+        - name: QUEUE_CAPACITY
+          valueFrom:
+            configMapKeyRef:
+              key: QUEUE_CAPACITY
+              name: bqs-env-bqs-env
+        - name: QUEUE_CAPACITY_SIZE_RATIO
+          valueFrom:
+            configMapKeyRef:
+              key: QUEUE_CAPACITY_SIZE_RATIO
+              name: bqs-env-bqs-env
+        - name: RETRY_QUEUE_CAPACITY
+          valueFrom:
+            configMapKeyRef:
+              key: RETRY_QUEUE_CAPACITY
+              name: bqs-env-bqs-env
+        - name: TZ_FILE
+          valueFrom:
+            configMapKeyRef:
+              key: TZ_FILE
+              name: bqs-env-time-env
+        image: secure.cxl-terragraph.com:443/beringei:latest
+        name: bqs
+        ports:
+        - containerPort: 8086
+        resources: {}
+        securityContext:
+          capabilities:
+            add:
+            - SYS_NICE
+        volumeMounts:
+        - mountPath: /home/nms/data
+          name: bqs-claim0
+        - mountPath: /mysql-scripts
+          name: bqs-claim1
+      restartPolicy: Always
+      volumes:
+      - name: bqs-claim0
+        persistentVolumeClaim:
+          claimName: bqs-claim0
+      - name: bqs-claim1
+        persistentVolumeClaim:
+          claimName: bqs-claim1
+status: {}

@@ -1,0 +1,79 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  annotations:
+    kompose.cmd: kompose convert
+    kompose.version: 1.16.0 (0c01309)
+  creationTimestamp: null
+  labels:
+    io.kompose.service: db-log-cleanup
+  name: db-log-cleanup
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        io.kompose.service: db-log-cleanup
+    spec:
+      containers:
+      - args:
+        - /bin/sh
+        - -c
+        - ln -sf ${TZ_FILE} /etc/localtime && until nc -z ${MYSQL_HOST} 3306; do sleep
+          1; done && /usr/src/service/mysql_partitioner/run
+        env:
+        - name: LOG_FILE_PATH
+          valueFrom:
+            configMapKeyRef:
+              key: LOG_FILE_PATH
+              name: db-log-cleanup-env-cleaner-env
+        - name: MAX_ALERTS_PARTITIONS
+          valueFrom:
+            configMapKeyRef:
+              key: MAX_ALERTS_PARTITIONS
+              name: db-log-cleanup-env-cleaner-env
+        - name: MAX_EVENTS_PARTITIONS
+          valueFrom:
+            configMapKeyRef:
+              key: MAX_EVENTS_PARTITIONS
+              name: db-log-cleanup-env-cleaner-env
+        - name: MAX_USED_GB
+          valueFrom:
+            configMapKeyRef:
+              key: MAX_USED_GB
+              name: db-log-cleanup-env-cleaner-env
+        - name: MYSQL_HOST
+          valueFrom:
+            configMapKeyRef:
+              key: MYSQL_HOST
+              name: db-log-cleanup-env-mysql-env
+        - name: MYSQL_PASS
+          valueFrom:
+            configMapKeyRef:
+              key: MYSQL_PASS
+              name: db-log-cleanup-env-mysql-env
+        - name: MYSQL_USER
+          valueFrom:
+            configMapKeyRef:
+              key: MYSQL_USER
+              name: db-log-cleanup-env-mysql-env
+        - name: TZ_FILE
+          valueFrom:
+            configMapKeyRef:
+              key: TZ_FILE
+              name: db-log-cleanup-env-time-env
+        image: secure.cxl-terragraph.com:443/nms:latest
+        name: db-log-cleanup
+        resources: {}
+        volumeMounts:
+        - mountPath: /logs
+          name: db-log-cleanup-claim0
+      restartPolicy: Always
+      volumes:
+      - name: db-log-cleanup-claim0
+        persistentVolumeClaim:
+          claimName: db-log-cleanup-claim0
+status: {}

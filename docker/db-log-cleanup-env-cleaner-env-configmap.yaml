@@ -1,0 +1,12 @@
+apiVersion: v1
+data:
+  LOG_FILE_PATH: /logs
+  MAX_ALERTS_PARTITIONS: "15"
+  MAX_EVENTS_PARTITIONS: "15"
+  MAX_USED_GB: "10"
+kind: ConfigMap
+metadata:
+  creationTimestamp: null
+  labels:
+    io.kompose.service: db-log-cleanup-env-cleaner-env
+  name: db-log-cleanup-env-cleaner-env

@@ -1,0 +1,68 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  annotations:
+    kompose.cmd: kompose convert
+    kompose.version: 1.16.0 (0c01309)
+  creationTimestamp: null
+  labels:
+    io.kompose.service: beringei-1s
+  name: beringei-1s
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        io.kompose.service: beringei-1s
+    spec:
+      containers:
+      - args:
+        - /bin/sh
+        - -c
+        - ln -sf ${TZ_FILE} /etc/localtime && beringei/tools/beringei_configuration_generator
+          --file_path ${NAME}.json --host_names ${HOSTNAME} --port ${PORT} && beringei/service/beringei_main
+          -beringei_configuration_path ${NAME}.json -create_directories -sleep_between_bucket_finalization_secs
+          ${BUCKET_FINALIZE_SEC} -allowed_timestamp_behind ${ALLOWED_TIMESTAMP_BEHIND}
+          -bucket_size ${BUCKET_SIZE} -buckets ${BUCKETS} -data_directory=/data/${NAME}
+          --port ${PORT} -mintimestampdelta=${INTERVAL} -logtostderr -v=2
+        env:
+        - name: ALLOWED_TIMESTAMP_BEHIND
+          value: "30"
+        - name: BERINGEI_HOST
+          value: beringei
+        - name: BUCKETS
+          value: "12"
+        - name: BUCKET_FINALIZE_SEC
+          value: "10"
+        - name: BUCKET_SIZE
+          value: "300"
+        - name: INTERVAL
+          value: "1"
+        - name: NAME
+          value: beringei_1s
+        - name: PORT
+          value: "9991"
+        - name: TZ_FILE
+          valueFrom:
+            configMapKeyRef:
+              key: TZ_FILE
+              name: beringei-1s-env-time-env
+        image: secure.cxl-terragraph.com:443/beringei:latest
+        name: beringei-1s
+        resources: {}
+        securityContext:
+          capabilities:
+            add:
+            - SYS_NICE
+        volumeMounts:
+        - mountPath: /data
+          name: beringei-1s-claim0
+      restartPolicy: Always
+      volumes:
+      - name: beringei-1s-claim0
+        persistentVolumeClaim:
+          claimName: beringei-1s-claim0
+status: {}

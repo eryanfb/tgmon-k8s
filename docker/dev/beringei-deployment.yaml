@@ -1,0 +1,42 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  annotations:
+    kompose.cmd: kompose convert
+    kompose.version: 1.16.0 (0c01309)
+  creationTimestamp: null
+  labels:
+    io.kompose.service: beringei
+  name: beringei
+spec:
+  replicas: 1
+  strategy: {}
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        io.kompose.service: beringei
+    spec:
+      containers:
+      - args:
+        - /bin/sh
+        - -c
+        - beringei/tools/beringei_configuration_generator --file_path beringei.json
+          --host_names beringei && beringei/service/beringei_main -beringei_configuration_path
+          beringei.json -create_directories -sleep_between_bucket_finalization_secs
+          60 -allowed_timestamp_behind 300 -bucket_size 600 -buckets 144 -logtostderr
+          -v=2
+        env:
+        - name: BERINGEI_HOST
+          value: beringei
+        image: terragraph/beringei:latest
+        name: beringei
+        ports:
+        - containerPort: 9999
+        resources: {}
+        securityContext:
+          capabilities:
+            add:
+            - SYS_NICE
+      restartPolicy: Always
+status: {}

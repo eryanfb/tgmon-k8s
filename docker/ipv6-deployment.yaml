@@ -1,0 +1,44 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  annotations:
+    kompose.cmd: kompose convert
+    kompose.version: 1.16.0 (0c01309)
+  creationTimestamp: null
+  labels:
+    io.kompose.service: ipv6
+  name: ipv6
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        io.kompose.service: ipv6
+    spec:
+      containers:
+      - image: secure.cxl-terragraph.com:443/migo:latest
+        name: ipv6
+        resources: {}
+        securityContext:
+          privileged: true
+        volumeMounts:
+        - mountPath: /var/run/docker.sock
+          name: ipv6-claim0
+          readOnly: true
+        - mountPath: /lib/modules
+          name: ipv6-claim1
+          readOnly: true
+      restartPolicy: Always
+      volumes:
+      - name: ipv6-claim0
+        persistentVolumeClaim:
+          claimName: ipv6-claim0
+          readOnly: true
+      - name: ipv6-claim1
+        persistentVolumeClaim:
+          claimName: ipv6-claim1
+          readOnly: true
+status: {}

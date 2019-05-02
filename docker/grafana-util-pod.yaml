@@ -1,0 +1,82 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: null
+  labels:
+    io.kompose.service: grafana-util
+  name: grafana-util
+spec:
+  containers:
+  - command:
+    - /bin/sh
+    - -c
+    - until nc -z grafana 3000; do sleep 1; done && until nc -z bqs 8086; do sleep
+      1; done && cd /var/lib/grafana && grafana_cli -d -c grafana -w ${GRAFANA_ADMIN_PASS}
+      import-data-sources --ds_ip bqs --ds_port 8086 --ds_file beringei_data_source.json;
+      grafana_cli -d -c grafana -w ${GRAFANA_ADMIN_PASS} import-data-sources --ds_ip
+      db --ds_port 3306 --ds_file mysql_data_source.json --ds_user ${GRAFANA_MYSQL_READER}
+      --ds_passwd ${GRAFANA_MYSQL_READER_PASS}; grafana_cli -d -c grafana -w ${GRAFANA_ADMIN_PASS}
+      import-data-sources --ds_ip prometheus --ds_port 9090 --ds_file prometheus_data_source.json;
+      grafana_cli -d -c grafana -w ${GRAFANA_ADMIN_PASS} add-users; grafana_cli -d
+      -c grafana -w ${GRAFANA_ADMIN_PASS} import-dashboards
+    env:
+    - name: GF_AUTH_ANONYMOUS_ENABLED
+      valueFrom:
+        configMapKeyRef:
+          key: GF_AUTH_ANONYMOUS_ENABLED
+          name: grafana-util-env-grafana-env
+    - name: GF_SERVER_ROOT_URL
+      valueFrom:
+        configMapKeyRef:
+          key: GF_SERVER_ROOT_URL
+          name: grafana-util-env-grafana-env
+    - name: GRAFANA_ADMIN_PASS
+      valueFrom:
+        configMapKeyRef:
+          key: GRAFANA_ADMIN_PASS
+          name: grafana-util-env-grafana-env
+    - name: GRAFANA_DB
+      valueFrom:
+        configMapKeyRef:
+          key: GRAFANA_DB
+          name: grafana-util-env-grafana-env
+    - name: GRAFANA_MYSQL_READER
+      valueFrom:
+        configMapKeyRef:
+          key: GRAFANA_MYSQL_READER
+          name: grafana-util-env-grafana-env
+    - name: GRAFANA_MYSQL_READER_PASS
+      valueFrom:
+        configMapKeyRef:
+          key: GRAFANA_MYSQL_READER_PASS
+          name: grafana-util-env-grafana-env
+    - name: GRAFANA_MYSQL_WRITER
+      valueFrom:
+        configMapKeyRef:
+          key: GRAFANA_MYSQL_WRITER
+          name: grafana-util-env-grafana-env
+    - name: GRAFANA_MYSQL_WRITER_PASS
+      valueFrom:
+        configMapKeyRef:
+          key: GRAFANA_MYSQL_WRITER_PASS
+          name: grafana-util-env-grafana-env
+    - name: MYSQL_HOST
+      valueFrom:
+        configMapKeyRef:
+          key: MYSQL_HOST
+          name: grafana-util-env-mysql-env
+    - name: MYSQL_PASS
+      valueFrom:
+        configMapKeyRef:
+          key: MYSQL_PASS
+          name: grafana-util-env-mysql-env
+    - name: MYSQL_USER
+      valueFrom:
+        configMapKeyRef:
+          key: MYSQL_USER
+          name: grafana-util-env-mysql-env
+    image: secure.cxl-terragraph.com:443/tgnms-grafana:latest
+    name: grafana-util
+    resources: {}
+  restartPolicy: Never
+status: {}

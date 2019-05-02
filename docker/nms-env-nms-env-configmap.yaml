@@ -1,0 +1,13 @@
+apiVersion: v1
+data:
+  BERINGEI_HOST: beringei
+  BQS: http://bqs:8086
+  MAPBOX_ACCESS_TOKEN: pk.eyJ1IjoiZmJtYXBzIiwiYSI6ImNqOGFmamkxdTBmbzUyd28xY3lybnEwamIifQ.oabgbuGc81ENlOJoPhv4OQ
+  NETWORK: example_networks
+  NODE_ENV: production
+kind: ConfigMap
+metadata:
+  creationTimestamp: null
+  labels:
+    io.kompose.service: nms-env-nms-env
+  name: nms-env-nms-env

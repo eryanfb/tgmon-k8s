@@ -1,0 +1,50 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  annotations:
+    kompose.cmd: kompose convert
+    kompose.version: 1.16.0 (0c01309)
+  creationTimestamp: null
+  labels:
+    io.kompose.service: udp-ping-client
+  name: udp-ping-client
+spec:
+  replicas: 1
+  strategy: {}
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        io.kompose.service: udp-ping-client
+    spec:
+      containers:
+      - args:
+        - /bin/sh
+        - -c
+        - until nc -z bqs 8086; do sleep 1; done && beringei/tools/ping_service/udp_ping_client
+          -logtostderr -mysql_url tcp://${MYSQL_HOST}:3306 -mysql_user ${MYSQL_USER}
+          -mysql_pass ${MYSQL_PASS} -bqs_ip bqs -bqs_port 8086
+        env:
+        - name: MYSQL_HOST
+          valueFrom:
+            configMapKeyRef:
+              key: MYSQL_HOST
+              name: udp-ping-client-env-mysql-env
+        - name: MYSQL_PASS
+          valueFrom:
+            configMapKeyRef:
+              key: MYSQL_PASS
+              name: udp-ping-client-env-mysql-env
+        - name: MYSQL_USER
+          valueFrom:
+            configMapKeyRef:
+              key: MYSQL_USER
+              name: udp-ping-client-env-mysql-env
+        image: secure.cxl-terragraph.com:443/beringei:latest
+        name: udp-ping-client
+        ports:
+        - containerPort: 31338
+          protocol: UDP
+        resources: {}
+      restartPolicy: Always
+status: {}

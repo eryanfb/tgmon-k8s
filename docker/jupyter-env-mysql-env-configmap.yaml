@@ -1,0 +1,11 @@
+apiVersion: v1
+data:
+  MYSQL_HOST: db
+  MYSQL_PASS: o0Oe8G0UrBrT
+  MYSQL_USER: nms
+kind: ConfigMap
+metadata:
+  creationTimestamp: null
+  labels:
+    io.kompose.service: jupyter-env-mysql-env
+  name: jupyter-env-mysql-env

@@ -1,0 +1,42 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  annotations:
+    kompose.cmd: kompose convert
+    kompose.version: 1.16.0 (0c01309)
+  creationTimestamp: null
+  labels:
+    io.kompose.service: nms
+  name: nms
+spec:
+  replicas: 1
+  strategy: {}
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        io.kompose.service: nms
+    spec:
+      containers:
+      - args:
+        - /bin/sh
+        - -c
+        - sleep 60; npm start
+        env:
+        - name: BERINGEI_HOST
+          value: beringei
+        - name: BQS
+          value: http://bqs:8086/query
+        - name: MYSQL_HOST
+          value: db
+        - name: MYSQL_PASS
+          value: "12345"
+        - name: MYSQL_USER
+          value: root
+        image: terragraph/nms:2796
+        name: nms
+        ports:
+        - containerPort: 80
+        resources: {}
+      restartPolicy: Always
+status: {}
